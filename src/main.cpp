@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
+#include "audio.h"
 
 // --- HARDWARE PINS ---
 #define XPT2046_IRQ 36
@@ -86,6 +87,16 @@ void drawSidebar(int activeBtn) {
 void generateRandomValue() {
   if (random(0, 100) < 50) currentLearningValue = String(random(0, 11));
   else currentLearningValue = String((char)random(65, 91));
+  
+  // Play corresponding sound
+  String path = "/";
+  if (currentLearningValue.length() == 1 && isAlpha(currentLearningValue.charAt(0))) {
+    path += String((char)tolower(currentLearningValue.charAt(0)));
+  } else {
+    path += currentLearningValue;
+  }
+  path += ".mp3";
+  audio_play(path.c_str());
 }
 
 void drawFace(float scale, bool smallMode) {
@@ -272,6 +283,8 @@ void setup() {
   tft.init(); tft.setRotation(1); tft.invertDisplay(true); tft.fillScreen(TFT_BLACK);
   touchSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
   touch.begin(touchSPI); touch.setRotation(1);
+  audio_begin();
+  audio_play_once("/henina.mp3");
   faceSprite.createSprite(SPRITE_W, SPRITE_H);
   faceSprite.setTextDatum(MC_DATUM);
   tft.fillScreen(TFT_BLACK);
@@ -282,7 +295,13 @@ void setup() {
 void loop() {
   unsigned long now = millis();
   static int lastBtn = 0;
+  static bool wasPetting = false;
+  static bool wasFeeding = false;
+  static bool wasDizzy = false;
+  static int lastMoodForSound = -1;
   int currentActiveBtn = 0;
+
+  audio_loop();
 
   if (touch.touched()) {
     if (isSleeping) { isSleeping = false; tft.fillRect(61, 0, 259, 240, TFT_BLACK); }
@@ -296,12 +315,16 @@ void loop() {
         isDizzy = false; 
         animEndTime = now + 3000; 
         currentActiveBtn = 1; 
+        if (!wasPetting) audio_play("/ailunina.mp3");
+        wasPetting = true;
       }
       else if (ty < 120) { 
         if(!isFeeding) { 
           isFeeding = true; 
           cookieX = 0; 
           feedingStartTime = now; 
+          if (!wasFeeding) audio_play("/yumtasty.mp3");
+          wasFeeding = true;
         } 
         currentActiveBtn = 2; 
       }
@@ -310,6 +333,8 @@ void loop() {
         isPetting = false; 
         animEndTime = now + 3000; 
         currentActiveBtn = 3; 
+        if (!wasDizzy) audio_play("/awishap.mp3");
+        wasDizzy = true;
       }
       else { 
         if (lastBtn != 4) {
@@ -328,6 +353,12 @@ void loop() {
   if (now > animEndTime) {
     isPetting = false;
     isDizzy = false;
+    wasPetting = false;
+    wasDizzy = false;
+  }
+
+  if (!isFeeding) {
+    wasFeeding = false;
   }
 
   if (!isSleeping && (now - lastTouchTime > SLEEP_THRESHOLD)) { 
@@ -338,6 +369,10 @@ void loop() {
   if (!isSleeping && currentAppMode == PET_MODE && (now - lastMoodChange > MOOD_INTERVAL)) {
     currentMood = random(0, 20); 
     lastMoodChange = now;
+    if (currentMood == 3 && lastMoodForSound != 3) {
+      audio_play("/onorain.mp3");
+    }
+    lastMoodForSound = currentMood;
   }
 
   if (currentAppMode == LEARNING_MODE && !isSleeping && (now - lastValueChange > 3000)) {
