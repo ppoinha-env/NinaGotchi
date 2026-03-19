@@ -1,8 +1,7 @@
 #include "save_manager.h"
-#include "sd_card.h"
 #include "pet.h"
 #include "inventory.h"
-#include <SD.h>
+#include <LittleFS.h>
 
 static bool s_dirty = false;
 static uint32_t s_lastSaveMs = 0;
@@ -30,9 +29,24 @@ static uint32_t crc32(const uint8_t* data, size_t len) {
 // Init
 // ============================================================
 
+static bool s_fsReady = false;
+
 void saveManagerBegin() {
     s_dirty = false;
     s_lastSaveMs = millis();
+
+    if (!LittleFS.begin(true)) {  // true = format on first use
+        Serial.println("[Save] LittleFS mount failed");
+        s_fsReady = false;
+        return;
+    }
+    s_fsReady = true;
+
+    // Create save directory if it doesn't exist
+    if (!LittleFS.exists(SAVE_DIR)) {
+        LittleFS.mkdir(SAVE_DIR);
+    }
+    Serial.println("[Save] LittleFS ready");
 }
 
 // ============================================================
@@ -40,25 +54,20 @@ void saveManagerBegin() {
 // ============================================================
 
 bool saveManagerLoad() {
-    if (!sdCardReady()) {
-        Serial.println("[Save] No SD card, using defaults");
+    if (!s_fsReady) {
+        Serial.println("[Save] LittleFS not ready, using defaults");
         return false;
     }
 
-    sdSwitchToSD();
-
-    File f = SD.open(SAVE_FILE, FILE_READ);
+    File f = LittleFS.open(SAVE_FILE, FILE_READ);
     if (!f) {
         Serial.println("[Save] No save file found");
-        sdSwitchToTouch();
         return false;
     }
 
     SavePayload payload;
     size_t bytesRead = f.read((uint8_t*)&payload, sizeof(SavePayload));
     f.close();
-
-    sdSwitchToTouch();
 
     if (bytesRead != sizeof(SavePayload)) {
         Serial.printf("[Save] Bad size: %d vs %d\n", bytesRead, sizeof(SavePayload));
@@ -96,7 +105,7 @@ bool saveManagerLoad() {
 // ============================================================
 
 bool saveManagerSave() {
-    if (!sdCardReady()) return false;
+    if (!s_fsReady) return false;
 
     SavePayload payload;
     memset(&payload, 0, sizeof(payload));
@@ -108,14 +117,11 @@ bool saveManagerSave() {
     payload.decayMode = (uint8_t)s_decayMode;
     payload.soundEnabled = s_soundEnabled ? 1 : 0;
 
-    sdSwitchToSD();
-
     // Write to temp file first (atomic write)
     const char* tmpFile = "/rh_save/save.tmp";
-    File f = SD.open(tmpFile, FILE_WRITE);
+    File f = LittleFS.open(tmpFile, FILE_WRITE);
     if (!f) {
         Serial.println("[Save] Failed to open tmp file");
-        sdSwitchToTouch();
         return false;
     }
 
@@ -124,16 +130,13 @@ bool saveManagerSave() {
 
     if (written != sizeof(SavePayload)) {
         Serial.println("[Save] Write size mismatch");
-        SD.remove(tmpFile);
-        sdSwitchToTouch();
+        LittleFS.remove(tmpFile);
         return false;
     }
 
     // Rename tmp -> save
-    SD.remove(SAVE_FILE);
-    SD.rename(tmpFile, SAVE_FILE);
-
-    sdSwitchToTouch();
+    LittleFS.remove(SAVE_FILE);
+    LittleFS.rename(tmpFile, SAVE_FILE);
 
     s_dirty = false;
     s_lastSaveMs = millis();
@@ -173,13 +176,11 @@ void saveManagerNewPet() {
 }
 
 void saveManagerDeleteAll() {
-    if (!sdCardReady()) return;
+    if (!s_fsReady) return;
 
-    sdSwitchToSD();
-    SD.remove(SAVE_FILE);
-    SD.remove(SETTINGS_FILE);
-    SD.remove("/rh_save/save.tmp");
-    sdSwitchToTouch();
+    LittleFS.remove(SAVE_FILE);
+    LittleFS.remove(SETTINGS_FILE);
+    LittleFS.remove("/rh_save/save.tmp");
 
     Serial.println("[Save] All data deleted");
 }

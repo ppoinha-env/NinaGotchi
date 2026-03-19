@@ -69,6 +69,17 @@ static bool inputDebounced() {
     return true;
 }
 
+// Detect which menu item was directly tapped.
+// menuStartY: Y of first item, itemH: height per item (including gap),
+// itemCount: total items. Returns -1 if no item was hit.
+static int hitTestMenuItem(const InputState &input, int menuStartY, int itemH, int itemCount) {
+    if (!input.anyTouch || !input.freshPress) return -1;
+    if (input.touchY < menuStartY || input.touchY >= TAB_BAR_Y) return -1;
+    int idx = (input.touchY - menuStartY) / itemH;
+    if (idx < 0 || idx >= itemCount) return -1;
+    return idx;
+}
+
 static void transitionTo(UIState state) {
     s_uiState = state;
     s_needsRedraw = true;
@@ -331,6 +342,19 @@ static void tickFeedMenu(const InputState &input) {
 
     int visCount = inventory.getVisibleCount();
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 4, 30, visCount);
+    if (tapped >= 0) {
+        if (tapped == s_feedIdx) {
+            // Already selected — confirm
+            input.confirm ? (void)0 : (void)0; // fall through to confirm logic below
+        } else {
+            s_feedIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+    }
+
     if (input.up && inputDebounced()) {
         s_feedIdx = (s_feedIdx - 1 + visCount) % max(visCount, 1);
         s_needsRedraw = true;
@@ -339,7 +363,7 @@ static void tickFeedMenu(const InputState &input) {
         s_feedIdx = (s_feedIdx + 1) % max(visCount, 1);
         s_needsRedraw = true;
     }
-    if (input.confirm && visCount > 0) {
+    if ((input.confirm || tapped == s_feedIdx) && visCount > 0) {
         inventory.selectedIndex = s_feedIdx;
         ItemType type = inventory.getVisibleType(s_feedIdx);
         if (type == ITEM_ELDRITCH_EYE && pet.canEvolve()) {
@@ -374,6 +398,17 @@ static void tickPlayMenu(const InputState &input) {
     if (!input.freshPress) return;
     if (handleTabInput(input)) return;
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 8, 28, 4);
+    if (tapped >= 0) {
+        if (tapped != s_playIdx) {
+            s_playIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+        // tapped == s_playIdx → fall through to confirm
+    }
+
     if (input.up && inputDebounced()) {
         s_playIdx = (s_playIdx - 1 + 4) % 4;
         s_needsRedraw = true;
@@ -382,7 +417,7 @@ static void tickPlayMenu(const InputState &input) {
         s_playIdx = (s_playIdx + 1) % 4;
         s_needsRedraw = true;
     }
-    if (input.confirm) {
+    if (input.confirm || tapped == s_playIdx) {
         // Check if game is available
         if (s_playIdx == 3 && !pet.isDead()) {
             audio_play("/awishap.mp3");
@@ -424,6 +459,17 @@ static void tickSleepMenu(const InputState &input) {
     if (!input.freshPress) return;
     if (handleTabInput(input)) return;
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 30, 28, 4);
+    if (tapped >= 0) {
+        if (tapped != s_sleepIdx) {
+            s_sleepIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+        // tapped == s_sleepIdx → fall through to confirm
+    }
+
     if (input.up && inputDebounced()) {
         s_sleepIdx = (s_sleepIdx - 1 + 4) % 4;
         s_needsRedraw = true;
@@ -432,7 +478,7 @@ static void tickSleepMenu(const InputState &input) {
         s_sleepIdx = (s_sleepIdx + 1) % 4;
         s_needsRedraw = true;
     }
-    if (input.confirm) {
+    if (input.confirm || tapped == s_sleepIdx) {
         switch (s_sleepIdx) {
             case 0: // Quick nap
                 pet.startSleep();
@@ -478,6 +524,17 @@ static void tickInventory(const InputState &input) {
     if (handleTabInput(input)) return;
 
     int visCount = inventory.getVisibleCount();
+
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 4, 30, visCount);
+    if (tapped >= 0) {
+        if (tapped != s_invIdx) {
+            s_invIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+    }
+
     if (input.up && inputDebounced()) {
         s_invIdx = (s_invIdx - 1 + max(visCount, 1)) % max(visCount, 1);
         s_needsRedraw = true;
@@ -486,7 +543,7 @@ static void tickInventory(const InputState &input) {
         s_invIdx = (s_invIdx + 1) % max(visCount, 1);
         s_needsRedraw = true;
     }
-    if (input.confirm && visCount > 0) {
+    if ((input.confirm || tapped == s_invIdx) && visCount > 0) {
         inventory.selectedIndex = s_invIdx;
         ItemType type = inventory.getVisibleType(s_invIdx);
         if (type == ITEM_ELDRITCH_EYE && pet.canEvolve()) {
@@ -521,6 +578,16 @@ static void tickShop(const InputState &input) {
     if (!input.freshPress) return;
     if (handleTabInput(input)) return;
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 4, 30, SHOP_ITEM_COUNT);
+    if (tapped >= 0) {
+        if (tapped != s_shopIdx) {
+            s_shopIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+    }
+
     if (input.up && inputDebounced()) {
         s_shopIdx = (s_shopIdx - 1 + SHOP_ITEM_COUNT) % SHOP_ITEM_COUNT;
         s_needsRedraw = true;
@@ -529,7 +596,7 @@ static void tickShop(const InputState &input) {
         s_shopIdx = (s_shopIdx + 1) % SHOP_ITEM_COUNT;
         s_needsRedraw = true;
     }
-    if (input.confirm) {
+    if (input.confirm || tapped == s_shopIdx) {
         if (shopBuyItem(s_shopIdx)) {
             audio_play("/yumtasty.mp3");
             saveManagerMarkDirty();
@@ -553,11 +620,21 @@ static void tickDeath(const InputState &input) {
 
     if (!input.freshPress) return;
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, 130, 28, 2);
+    if (tapped >= 0) {
+        if (tapped != s_deathIdx) {
+            s_deathIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+    }
+
     if (input.up || input.down) {
         s_deathIdx = 1 - s_deathIdx;
         s_needsRedraw = true;
     }
-    if (input.confirm) {
+    if (input.confirm || tapped == s_deathIdx) {
         if (s_deathIdx == 0) {
             // Resurrection Run
             s_activeMiniGame = MG_RESURRECTION_RUN;
@@ -685,6 +762,16 @@ static void tickSettings(const InputState &input) {
 
     if (!input.freshPress) return;
 
+    // Direct tap on menu item
+    int tapped = hitTestMenuItem(input, HEADER_HEIGHT + 8, 28, 4);
+    if (tapped >= 0) {
+        if (tapped != s_settingsIdx) {
+            s_settingsIdx = tapped;
+            s_needsRedraw = true;
+            return;
+        }
+    }
+
     if (input.up && inputDebounced()) {
         s_settingsIdx = (s_settingsIdx - 1 + 4) % 4;
         s_needsRedraw = true;
@@ -693,7 +780,7 @@ static void tickSettings(const InputState &input) {
         s_settingsIdx = (s_settingsIdx + 1) % 4;
         s_needsRedraw = true;
     }
-    if (input.confirm) {
+    if (input.confirm || tapped == s_settingsIdx) {
         switch (s_settingsIdx) {
             case 0: {
                 // Cycle decay mode

@@ -75,17 +75,26 @@ void uiDrawStatBar(int x, int y, int w, int h, int value, int maxVal, uint16_t c
 }
 
 void uiDrawMenuItem(int y, const char* text, bool selected, uint16_t color) {
-    int h = 24;
+    int h = 28;
+    int margin = 6;
+    int btnX = margin;
+    int btnW = SCREEN_WIDTH - margin * 2;
+
     if (selected) {
-        tft.fillRect(0, y, SCREEN_WIDTH, h, COLOR_DARK_RED);
+        // Selected: filled button with bright border
+        tft.fillRoundRect(btnX, y, btnW, h, 4, COLOR_DARK_RED);
+        tft.drawRoundRect(btnX, y, btnW, h, 4, COLOR_HELLFIRE);
+        tft.drawRoundRect(btnX + 1, y + 1, btnW - 2, h - 2, 3, COLOR_HELLFIRE);
         tft.setTextColor(TFT_WHITE, COLOR_DARK_RED);
     } else {
-        tft.fillRect(0, y, SCREEN_WIDTH, h, COLOR_BG);
+        // Unselected: outlined button
+        tft.fillRoundRect(btnX, y, btnW, h, 4, COLOR_BG);
+        tft.drawRoundRect(btnX, y, btnW, h, 4, COLOR_ASH);
         tft.setTextColor(color, COLOR_BG);
     }
     tft.setTextDatum(ML_DATUM);
     tft.setTextSize(1);
-    tft.drawString(text, 10, y + h / 2);
+    tft.drawString(text, btnX + 10, y + h / 2);
 }
 
 void uiDrawCenteredText(const char* text, int y, uint16_t color, int textSize) {
@@ -428,9 +437,9 @@ void uiDrawFeedMenu(int selectedIndex) {
                     snprintf(effect, sizeof(effect), "+%dH +%dJ +%dE +%dHP",
                              d.hunger, d.happiness, d.energy, d.health);
                 }
-                tft.drawString(effect, SCREEN_WIDTH - 6, y + 12);
+                tft.drawString(effect, SCREEN_WIDTH - 12, y + 14);
             }
-            y += 24;
+            y += 30;
         }
     }
 
@@ -540,9 +549,9 @@ void uiDrawInventoryScreen(int selectedIndex) {
             if (i == selectedIndex) {
                 tft.setTextDatum(MR_DATUM);
                 tft.setTextColor(COLOR_ASH, (i == selectedIndex) ? COLOR_DARK_RED : COLOR_BG);
-                tft.drawString(itemDesc(type), SCREEN_WIDTH - 6, y + 12);
+                tft.drawString(itemDesc(type), SCREEN_WIDTH - 12, y + 14);
             }
-            y += 24;
+            y += 30;
         }
     }
 
@@ -587,9 +596,9 @@ void uiDrawShopScreen(int selectedIndex) {
         if (i == selectedIndex && !canAfford) {
             tft.setTextDatum(MR_DATUM);
             tft.setTextColor(COLOR_HELLFIRE, COLOR_DARK_RED);
-            tft.drawString("Can't afford", SCREEN_WIDTH - 6, y + 12);
+            tft.drawString("Can't afford", SCREEN_WIDTH - 12, y + 14);
         }
-        y += 24;
+        y += 30;
     }
 
     uiDrawTabBar(TAB_SHOP);

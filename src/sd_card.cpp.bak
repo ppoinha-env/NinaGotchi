@@ -21,12 +21,16 @@ static bool s_sdReady = false;
 
 bool sdCardBegin() {
     // Configure VSPI for SD card pins
+    // NOTE: must call end() first because ESP32 Arduino SPI.begin() is a no-op
+    // when _spi is already set (early return if _spi != NULL).
+    touchSPI.end();
     touchSPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
 
     if (!SD.begin(SD_CS, touchSPI, 80000000)) {
         Serial.println("[SD] Card mount failed");
         s_sdReady = false;
         // Restore touch pins even on failure
+        touchSPI.end();
         touchSPI.begin(TOUCH_SCK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
         return false;
     }
@@ -35,6 +39,7 @@ bool sdCardBegin() {
     if (cardType == CARD_NONE) {
         Serial.println("[SD] No card attached");
         s_sdReady = false;
+        touchSPI.end();
         touchSPI.begin(TOUCH_SCK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
         return false;
     }
@@ -50,6 +55,7 @@ bool sdCardBegin() {
     s_sdReady = true;
 
     // Switch back to touch pins after init
+    touchSPI.end();
     touchSPI.begin(TOUCH_SCK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
 
     Serial.println("[SD] Init OK");
@@ -57,10 +63,15 @@ bool sdCardBegin() {
 }
 
 void sdSwitchToSD() {
+    touchSPI.end();
     touchSPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
 }
 
 void sdSwitchToTouch() {
+    touchSPI.end();
+    // Ensure SD card is deselected before switching to touch pins
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
     touchSPI.begin(TOUCH_SCK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
 }
 

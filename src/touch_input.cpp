@@ -39,6 +39,10 @@ InputState touchInputPoll(XPT2046_Touchscreen &touch) {
         tx = clampi(tx, 0, SCREEN_WIDTH - 1);
         ty = clampi(ty, 0, SCREEN_HEIGHT - 1);
 
+        if (!s_wasTouched) {
+            Serial.printf("[Touch] raw(%d,%d) mapped(%d,%d)\n", p.x, p.y, tx, ty);
+        }
+
         s_lastX = tx;
         s_lastY = ty;
         s_lastTouchMs = millis();

@@ -11,7 +11,6 @@
 #include "audio.h"
 #include "game_types.h"
 #include "touch_input.h"
-#include "sd_card.h"
 #include "pet.h"
 #include "inventory.h"
 #include "save_manager.h"
@@ -48,12 +47,7 @@ void setup() {
     tft.invertDisplay(true);
     tft.fillScreen(TFT_BLACK);
 
-    // --- SD Card init (MUST be before touch init — shares VSPI) ---
-    // sdCardBegin() temporarily configures VSPI for SD pins,
-    // then restores touch pins before returning
-    sdCardBegin();
-
-    // --- Touchscreen init (unchanged) ---
+    // --- Touchscreen init ---
     touchSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
     touch.begin(touchSPI);
     touch.setRotation(1);
